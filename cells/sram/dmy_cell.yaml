@@ -1,0 +1,56 @@
+# Dummy SRAM cell (sky130A)
+#
+# Same physical structure as BIT_CELL but with gate connections tied to
+# fixed rails so storage nodes are in a known stable state. Used as a
+# dummy row to improve bitline differential during read.
+#
+# X0: PD NMOS — gate=VSS  (always off)
+# X1: PD NMOS — gate=VDD  (always on)
+# X2: PU PMOS — gate=VSS  (always on)
+# X3: PU PMOS — gate=VDD  (always off)
+# X4, X5: access transistors (same as BIT_CELL)
+#
+# Ports:
+#   VDD, VSS — supply rails
+#   WL       — word line  (active high)
+#   BL, BL_  — bit line and complement
+
+cell:
+  name: DMY_CELL
+  ports: [VDD, VSS, WL, BL, BL_]
+  components:
+    - id: X0
+      type: primitive
+      model: nmos
+      connections: {D: Q, G: VSS, S: VSS, B: VSS}
+      parameters: {W: "0.80", L: "0.15", model_name: nmos_1v8}
+
+    - id: X1
+      type: primitive
+      model: nmos
+      connections: {D: Q_, G: VDD, S: VSS, B: VSS}
+      parameters: {W: "0.80", L: "0.15", model_name: nmos_1v8}
+
+    - id: X2
+      type: primitive
+      model: pmos
+      connections: {D: Q, G: VSS, S: VDD, B: VDD}
+      parameters: {W: "0.42", L: "0.15", model_name: pmos_1v8}
+
+    - id: X3
+      type: primitive
+      model: pmos
+      connections: {D: Q_, G: VDD, S: VDD, B: VDD}
+      parameters: {W: "0.42", L: "0.15", model_name: pmos_1v8}
+
+    - id: X4
+      type: primitive
+      model: nmos
+      connections: {D: Q, G: WL, S: BL, B: VSS}
+      parameters: {W: "0.60", L: "0.15", model_name: nmos_1v8}
+
+    - id: X5
+      type: primitive
+      model: nmos
+      connections: {D: Q_, G: WL, S: BL_, B: VSS}
+      parameters: {W: "0.60", L: "0.15", model_name: nmos_1v8}

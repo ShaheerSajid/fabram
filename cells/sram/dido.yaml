@@ -1,0 +1,145 @@
+# Digital-In Digital-Out (DIDO) peripheral cell (sky130A)
+#
+# Combines precharge, column select, read pass transistors, and write
+# pass transistors into one column-peripheral block.
+#
+# Precharge (X0–X4):
+#   X0, X1, X2 — equalise and precharge BL/BL_ to VDD via X6/net5/net6
+#   X3, X4     — PCHG signal buffer (inverter for net6 drive)
+#   X5, X6     — PCHG-gated inverter driving net6 (precharge control)
+#
+# Read path (X7–X9, X12–X14):
+#   X7, X8     — column-select PMOS cross-coupled (SEL gated)
+#   X9         — column-select PMOS pull-up
+#   X12        — column-select NMOS pull-down
+#   X13, X14   — column-select inverter (net3 ← net4)
+#
+# Write path (X10, X11):
+#   X10, X11   — write pass NMOS (WREN-gated NAND2 drives DW/DW_ onto BL/BL_)
+#
+# Logic (X15, X16):
+#   X15        — NAND2 instance: inputs net3, WREN → net1
+#   X16        — NOT  instance: input net1 → net2
+#
+# Ports:
+#   VDD, VSS — supply rails
+#   PCHG     — precharge enable  (active low)
+#   WREN     — write enable      (active high)
+#   SEL      — column select     (active low)
+#   BL, BL_  — bit lines
+#   DW, DW_  — write data and complement
+#   DR, DR_  — read  data and complement
+
+cell:
+  name: DIDO
+  ports: [VDD, VSS, PCHG, WREN, SEL, BL, BL_, DW, DW_, DR, DR_]
+  deps:
+    - ../primitives/not.yaml
+    - ../primitives/nand2.yaml
+  components:
+    # Precharge transistors
+    - id: X0
+      type: primitive
+      model: pmos
+      connections: {D: BL_, G: net6, S: VDD, B: VDD}
+      parameters: {W: "0.42", L: "0.15", model_name: pmos_1v8}
+
+    - id: X1
+      type: primitive
+      model: pmos
+      connections: {D: BL, G: net6, S: BL_, B: VDD}
+      parameters: {W: "0.42", L: "0.15", model_name: pmos_1v8}
+
+    - id: X2
+      type: primitive
+      model: pmos
+      connections: {D: BL, G: net6, S: VDD, B: VDD}
+      parameters: {W: "0.42", L: "0.15", model_name: pmos_1v8}
+
+    - id: X3
+      type: primitive
+      model: pmos
+      connections: {D: net6, G: net5, S: VDD, B: VDD}
+      parameters: {W: "0.42", L: "0.15", model_name: pmos_1v8}
+
+    - id: X4
+      type: primitive
+      model: nmos
+      connections: {D: net6, G: net5, S: VSS, B: VSS}
+      parameters: {W: "0.42", L: "0.15", model_name: nmos_1v8}
+
+    - id: X5
+      type: primitive
+      model: pmos
+      connections: {D: net5, G: PCHG, S: VDD, B: VDD}
+      parameters: {W: "0.42", L: "0.15", model_name: pmos_1v8}
+
+    - id: X6
+      type: primitive
+      model: nmos
+      connections: {D: net5, G: PCHG, S: VSS, B: VSS}
+      parameters: {W: "0.42", L: "0.15", model_name: nmos_1v8}
+
+    # Read path — column select (PMOS, active low SEL)
+    - id: X7
+      type: primitive
+      model: pmos
+      connections: {D: BL_, G: net4, S: DR_, B: VDD}
+      parameters: {W: "0.42", L: "0.15", model_name: pmos_1v8}
+
+    - id: X8
+      type: primitive
+      model: pmos
+      connections: {D: DR, G: net4, S: BL, B: VDD}
+      parameters: {W: "0.42", L: "0.15", model_name: pmos_1v8}
+
+    - id: X9
+      type: primitive
+      model: pmos
+      connections: {D: net4, G: SEL, S: VDD, B: VDD}
+      parameters: {W: "0.42", L: "0.15", model_name: pmos_1v8}
+
+    # Write path — pass NMOS (WREN-gated)
+    - id: X10
+      type: primitive
+      model: nmos
+      connections: {D: BL, G: net2, S: DW, B: VSS}
+      parameters: {W: "0.42", L: "0.15", model_name: nmos_1v8}
+
+    - id: X11
+      type: primitive
+      model: nmos
+      connections: {D: DW_, G: net2, S: BL_, B: VSS}
+      parameters: {W: "0.42", L: "0.15", model_name: nmos_1v8}
+
+    # Column select NMOS pull-down
+    - id: X12
+      type: primitive
+      model: nmos
+      connections: {D: net4, G: SEL, S: VSS, B: VSS}
+      parameters: {W: "0.42", L: "0.15", model_name: nmos_1v8}
+
+    # Column select inverter (net4 → net3)
+    - id: X13
+      type: primitive
+      model: nmos
+      connections: {D: net3, G: net4, S: VSS, B: VSS}
+      parameters: {W: "0.42", L: "0.15", model_name: nmos_1v8}
+
+    - id: X14
+      type: primitive
+      model: pmos
+      connections: {D: net3, G: net4, S: VDD, B: VDD}
+      parameters: {W: "0.42", L: "0.15", model_name: pmos_1v8}
+
+    # Write enable logic: NAND2(net3, WREN) → net1
+    - id: X15
+      type: subckt
+      model: NAND2
+      connections: {VDD: VDD, VSS: VSS, A: net3, B: WREN, Y: net1}
+
+    # Write data invert: NOT(net1) → net2
+    - id: X16
+      type: subckt
+      model: NOT
+      connections: {VDD: VDD, VSS: VSS, A: net1, B: net2}

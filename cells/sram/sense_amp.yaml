@@ -1,0 +1,135 @@
+# Sense amplifier (sky130A)
+#
+# A current-mirror sense amp with an integrated latch for the output.
+#
+# Input stage (X0–X4):
+#   X0       — SAEN tail NMOS (gating transistor)
+#   X1, X2   — differential input NMOS pair (BL_, BL)
+#   X3, X4   — PMOS current-mirror load (diode-connected X3)
+#
+# Output inverter chain (X5–X8):
+#   X5, X6   — 2x inverter (diff2 → diff2_)
+#   X7, X8   — 2x inverter (diff2_ → SB_)
+#
+# Output latch (X9–X14):
+#   X9–X12   — cross-coupled latch (SB_w ↔ Q_)
+#   X13, X14 — access transistors into latch (SAEN gated)
+#
+# Final buffer (X15, X16):
+#   X15, X16 — 2x/1x inverter (SB_w → SB)
+#
+# Ports:
+#   VDD, VSS — supply rails
+#   SAEN     — sense-enable (active high)
+#   BL, BL_  — bit line and complement (inputs)
+#   SB       — sensed output bit
+
+cell:
+  name: SENSE_AMP
+  ports: [VDD, VSS, SAEN, BL, BL_, SB]
+  components:
+    # --- Input stage ---
+    - id: X0
+      type: primitive
+      model: nmos
+      connections: {D: net1, G: SAEN, S: VSS, B: VSS}
+      parameters: {W: "0.84", L: "0.15", model_name: nmos_1v8}
+
+    - id: X1
+      type: primitive
+      model: nmos
+      connections: {D: diff1, G: BL_, S: net1, B: net1}
+      parameters: {W: "0.42", L: "0.15", model_name: nmos_1v8}
+
+    - id: X2
+      type: primitive
+      model: nmos
+      connections: {D: diff2, G: BL, S: net1, B: net1}
+      parameters: {W: "0.42", L: "0.15", model_name: nmos_1v8}
+
+    - id: X3
+      type: primitive
+      model: pmos
+      connections: {D: diff1, G: diff1, S: VDD, B: VDD}
+      parameters: {W: "0.42", L: "0.15", model_name: pmos_1v8}
+
+    - id: X4
+      type: primitive
+      model: pmos
+      connections: {D: diff2, G: diff1, S: VDD, B: VDD}
+      parameters: {W: "0.42", L: "0.15", model_name: pmos_1v8}
+
+    # --- Output inverter chain ---
+    - id: X5
+      type: primitive
+      model: pmos
+      connections: {D: diff2_, G: diff2, S: VDD, B: VDD}
+      parameters: {W: "2", L: "0.15", model_name: pmos_1v8}
+
+    - id: X6
+      type: primitive
+      model: nmos
+      connections: {D: diff2_, G: diff2, S: VSS, B: VSS}
+      parameters: {W: "2", L: "0.15", model_name: nmos_1v8}
+
+    - id: X7
+      type: primitive
+      model: pmos
+      connections: {D: SB_, G: diff2_, S: VDD, B: VDD}
+      parameters: {W: "2", L: "0.15", model_name: pmos_1v8}
+
+    - id: X8
+      type: primitive
+      model: nmos
+      connections: {D: SB_, G: diff2_, S: VSS, B: VSS}
+      parameters: {W: "2", L: "0.15", model_name: nmos_1v8}
+
+    # --- Output latch ---
+    - id: X9
+      type: primitive
+      model: nmos
+      connections: {D: SB_w, G: Q_, S: VSS, B: VSS}
+      parameters: {W: "0.80", L: "0.15", model_name: nmos_1v8}
+
+    - id: X10
+      type: primitive
+      model: nmos
+      connections: {D: Q_, G: SB_w, S: VSS, B: VSS}
+      parameters: {W: "0.80", L: "0.15", model_name: nmos_1v8}
+
+    - id: X11
+      type: primitive
+      model: pmos
+      connections: {D: SB_w, G: Q_, S: VDD, B: VDD}
+      parameters: {W: "0.42", L: "0.15", model_name: pmos_1v8}
+
+    - id: X12
+      type: primitive
+      model: pmos
+      connections: {D: Q_, G: SB_w, S: VDD, B: VDD}
+      parameters: {W: "0.42", L: "0.15", model_name: pmos_1v8}
+
+    - id: X13
+      type: primitive
+      model: nmos
+      connections: {D: SB_w, G: SAEN, S: SB_, B: VSS}
+      parameters: {W: "0.60", L: "0.15", model_name: nmos_1v8}
+
+    - id: X14
+      type: primitive
+      model: nmos
+      connections: {D: Q_, G: SAEN, S: diff2_, B: VSS}
+      parameters: {W: "0.60", L: "0.15", model_name: nmos_1v8}
+
+    # --- Final buffer ---
+    - id: X15
+      type: primitive
+      model: pmos
+      connections: {D: SB, G: SB_w, S: VDD, B: VDD}
+      parameters: {W: "2", L: "0.15", model_name: pmos_1v8}
+
+    - id: X16
+      type: primitive
+      model: nmos
+      connections: {D: SB, G: SB_w, S: VSS, B: VSS}
+      parameters: {W: "1", L: "0.15", model_name: nmos_1v8}

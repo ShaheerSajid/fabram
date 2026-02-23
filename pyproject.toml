@@ -1,0 +1,15 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "fabram"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = ["spice_gen"]
+
+[project.scripts]
+fabram = "fabram.__main__:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["fabram"]

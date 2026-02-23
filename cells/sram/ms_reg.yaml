@@ -1,0 +1,169 @@
+# Master-Slave D Flip-Flop (sky130A)
+#
+# A full master-slave register built from transmission gates and
+# cross-coupled inverters. All transistors W=0.42um, L=0.15um.
+#
+# Ports:
+#   VDD, VSS — supply rails
+#   clk      — clock input
+#   D        — data input
+#   Q        — data output
+
+cell:
+  name: MS_REG
+  ports: [VDD, VSS, clk, D, Q]
+  components:
+    # Clock buffer / complement
+    - id: X0
+      type: primitive
+      model: nmos
+      connections: {D: net3, G: clk, S: VSS, B: VSS}
+      parameters: {W: "0.42", L: "0.15", model_name: nmos_1v8}
+
+    - id: X8
+      type: primitive
+      model: pmos
+      connections: {D: net3, G: clk, S: VDD, B: VDD}
+      parameters: {W: "0.42", L: "0.15", model_name: pmos_1v8}
+
+    # Master stage transmission gate (clk gated)
+    - id: X1
+      type: primitive
+      model: nmos
+      connections: {D: net4, G: net2, S: net5, B: VSS}
+      parameters: {W: "0.42", L: "0.15", model_name: nmos_1v8}
+
+    - id: X10
+      type: primitive
+      model: pmos
+      connections: {D: Din, G: net2, S: net1, B: VDD}
+      parameters: {W: "0.42", L: "0.15", model_name: pmos_1v8}
+
+    # Slave output inverter
+    - id: X2
+      type: primitive
+      model: nmos
+      connections: {D: net55, G: Q, S: VSS, B: VSS}
+      parameters: {W: "0.42", L: "0.15", model_name: nmos_1v8}
+
+    - id: X13
+      type: primitive
+      model: pmos
+      connections: {D: net55, G: Q, S: VDD, B: VDD}
+      parameters: {W: "0.42", L: "0.15", model_name: pmos_1v8}
+
+    # Master inverter
+    - id: X3
+      type: primitive
+      model: nmos
+      connections: {D: net2, G: net3, S: VSS, B: VSS}
+      parameters: {W: "0.42", L: "0.15", model_name: nmos_1v8}
+
+    - id: X11
+      type: primitive
+      model: pmos
+      connections: {D: net2, G: net3, S: VDD, B: VDD}
+      parameters: {W: "0.42", L: "0.15", model_name: pmos_1v8}
+
+    # Master stage transmission gate (clk_ gated)
+    - id: X5
+      type: primitive
+      model: nmos
+      connections: {D: Din, G: net3, S: net1, B: VSS}
+      parameters: {W: "0.42", L: "0.15", model_name: nmos_1v8}
+
+    - id: X15
+      type: primitive
+      model: pmos
+      connections: {D: net4, G: net3, S: net5, B: VDD}
+      parameters: {W: "0.42", L: "0.15", model_name: pmos_1v8}
+
+    # Slave output buffer
+    - id: X4
+      type: primitive
+      model: nmos
+      connections: {D: Q, G: net5, S: VSS, B: VSS}
+      parameters: {W: "0.42", L: "0.15", model_name: nmos_1v8}
+
+    - id: X9
+      type: primitive
+      model: pmos
+      connections: {D: Q, G: net5, S: VDD, B: VDD}
+      parameters: {W: "0.42", L: "0.15", model_name: pmos_1v8}
+
+    # Feedback inverter (master latch)
+    - id: X6
+      type: primitive
+      model: nmos
+      connections: {D: net11, G: net4, S: VSS, B: VSS}
+      parameters: {W: "0.42", L: "0.15", model_name: nmos_1v8}
+
+    - id: X12
+      type: primitive
+      model: pmos
+      connections: {D: net11, G: net4, S: VDD, B: VDD}
+      parameters: {W: "0.42", L: "0.15", model_name: pmos_1v8}
+
+    # Slave stage transmission gate
+    - id: X7
+      type: primitive
+      model: nmos
+      connections: {D: net4, G: net1, S: VSS, B: VSS}
+      parameters: {W: "0.42", L: "0.15", model_name: nmos_1v8}
+
+    - id: X14
+      type: primitive
+      model: pmos
+      connections: {D: net4, G: net1, S: VDD, B: VDD}
+      parameters: {W: "0.42", L: "0.15", model_name: pmos_1v8}
+
+    # Slave latch feedback (net11 → net2 path)
+    - id: X16
+      type: primitive
+      model: nmos
+      connections: {D: net11, G: net2, S: net1, B: VSS}
+      parameters: {W: "0.42", L: "0.15", model_name: nmos_1v8}
+
+    - id: X17
+      type: primitive
+      model: pmos
+      connections: {D: net11, G: net3, S: net1, B: VDD}
+      parameters: {W: "0.42", L: "0.15", model_name: pmos_1v8}
+
+    # Slave latch feedback (net55 → net5 path)
+    - id: X18
+      type: primitive
+      model: nmos
+      connections: {D: net55, G: net3, S: net5, B: VSS}
+      parameters: {W: "0.42", L: "0.15", model_name: nmos_1v8}
+
+    - id: X19
+      type: primitive
+      model: pmos
+      connections: {D: net55, G: net2, S: net5, B: VDD}
+      parameters: {W: "0.42", L: "0.15", model_name: pmos_1v8}
+
+    # Input buffer (D → D_, Din)
+    - id: X20
+      type: primitive
+      model: nmos
+      connections: {D: D_, G: D, S: VSS, B: VSS}
+      parameters: {W: "0.42", L: "0.15", model_name: nmos_1v8}
+
+    - id: X21
+      type: primitive
+      model: pmos
+      connections: {D: D_, G: D, S: VDD, B: VDD}
+      parameters: {W: "0.42", L: "0.15", model_name: pmos_1v8}
+
+    - id: X22
+      type: primitive
+      model: nmos
+      connections: {D: Din, G: D_, S: VSS, B: VSS}
+      parameters: {W: "0.42", L: "0.15", model_name: nmos_1v8}
+
+    - id: X23
+      type: primitive
+      model: pmos
+      connections: {D: Din, G: D_, S: VDD, B: VDD}
+      parameters: {W: "0.42", L: "0.15", model_name: pmos_1v8}

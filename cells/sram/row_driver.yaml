@@ -1,0 +1,38 @@
+# Row driver cell (sky130A)
+#
+# Drives the word line (B) from an address bit (A) gated by a word-line
+# enable signal (WLEN). A NAND2 computes the qualified enable, then a
+# high-drive inverter (W=8/4) drives the actual WL output.
+#
+# Logic: B = !NAND2(A, WLEN)  i.e.  B = A & WLEN  (buffered)
+#
+# Ports:
+#   VDD, VSS — supply rails
+#   WLEN     — word-line enable (active high)
+#   A        — address bit input
+#   B        — buffered word-line output (active high)
+
+cell:
+  name: ROW_DRIVER
+  ports: [VDD, VSS, WLEN, A, B]
+  deps:
+    - ../primitives/nand2.yaml
+  components:
+    # NAND2(A, WLEN) → net1
+    - id: X0
+      type: subckt
+      model: NAND2
+      connections: {VDD: VDD, VSS: VSS, A: A, B: WLEN, Y: net1}
+
+    # High-drive buffer: NOT(net1) → B
+    - id: X1
+      type: primitive
+      model: pmos
+      connections: {D: B, G: net1, S: VDD, B: VDD}
+      parameters: {W: "8", L: "0.15", model_name: pmos_1v8}
+
+    - id: X2
+      type: primitive
+      model: nmos
+      connections: {D: B, G: net1, S: VSS, B: VSS}
+      parameters: {W: "4", L: "0.15", model_name: nmos_1v8}

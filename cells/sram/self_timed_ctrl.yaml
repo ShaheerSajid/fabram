@@ -1,0 +1,157 @@
+# Self-timed control block (sky130A)
+#
+# Generates all SRAM timing signals from clk and cs/write:
+#
+#   clk_   = NOT(clk)                          — X0, X1
+#   WLENP  = NOT(clk_) = clk                   — X2, X3  (buffered)
+#   WREN_  = NOT(write)                         — X4
+#   PCHG   high-drive buffer of clk_           — X8, X9
+#   DBL_/DBL precharge-time dummy bitlines      — X10–X12
+#   WLENPP = NAND2(cs, WLENP)                  — X13
+#   WLEN   high-drive buffer of WLENPP         — X21, X22
+#   RBL    = NOT(DBL_)                          — X15
+#   SAEN_  = NAND2(WLEN, RBL)                  — X16
+#   SAEN   high-drive buffer of SAEN_          — X17, X18
+#   WREN   high-drive buffer of WREN_          — X19, X20
+#
+# Note: del_cell (delay cell) is not instantiated (commented out in source).
+#
+# Ports:
+#   VDD, VSS  — supply rails
+#   clk       — clock input
+#   cs        — chip select (active high)
+#   write     — write mode (active high; low = read)
+#   DBL, DBL_ — dummy bitlines (outputs, driven by precharge logic)
+#   WREN      — write enable  output (active high)
+#   PCHG      — precharge     output (active low  — drives precharge PMOS)
+#   WLEN      — word-line enable output (active high)
+#   SAEN      — sense-amp enable output (active high)
+
+cell:
+  name: SELF_TIMED_CTRL
+  ports: [VDD, VSS, clk, cs, write, DBL, DBL_, WREN, PCHG, WLEN, SAEN]
+  deps:
+    - ../primitives/not.yaml
+    - ../primitives/nand2.yaml
+    - ../primitives/nand3.yaml
+  components:
+    # clk_ = NOT(clk)
+    - id: X0
+      type: primitive
+      model: pmos
+      connections: {D: clk_, G: clk, S: VDD, B: VDD}
+      parameters: {W: "0.42", L: "0.15", model_name: pmos_1v8}
+
+    - id: X1
+      type: primitive
+      model: nmos
+      connections: {D: clk_, G: clk, S: VSS, B: VSS}
+      parameters: {W: "0.42", L: "0.15", model_name: nmos_1v8}
+
+    # WLENP = NOT(clk_)  — restores polarity of clk
+    - id: X2
+      type: primitive
+      model: pmos
+      connections: {D: WLENP, G: clk_, S: VDD, B: VDD}
+      parameters: {W: "0.42", L: "0.15", model_name: pmos_1v8}
+
+    - id: X3
+      type: primitive
+      model: nmos
+      connections: {D: WLENP, G: clk_, S: VSS, B: VSS}
+      parameters: {W: "0.42", L: "0.15", model_name: nmos_1v8}
+
+    # WREN_ = NOT(write)
+    - id: X4
+      type: subckt
+      model: NOT
+      connections: {VDD: VDD, VSS: VSS, A: write, B: WREN_}
+
+    # PCHG high-drive buffer of clk_ (W=8/4)
+    - id: X8
+      type: primitive
+      model: pmos
+      connections: {D: PCHG, G: clk_, S: VDD, B: VDD}
+      parameters: {W: "8", L: "0.15", model_name: pmos_1v8}
+
+    - id: X9
+      type: primitive
+      model: nmos
+      connections: {D: PCHG, G: clk_, S: VSS, B: VSS}
+      parameters: {W: "4", L: "0.15", model_name: nmos_1v8}
+
+    # Dummy bitline precharge (PCHG-gated, mirrors column precharge)
+    - id: X10
+      type: primitive
+      model: pmos
+      connections: {D: DBL_, G: PCHG, S: VDD, B: VDD}
+      parameters: {W: "0.42", L: "0.15", model_name: pmos_1v8}
+
+    - id: X11
+      type: primitive
+      model: pmos
+      connections: {D: DBL, G: PCHG, S: DBL_, B: VDD}
+      parameters: {W: "0.42", L: "0.15", model_name: pmos_1v8}
+
+    - id: X12
+      type: primitive
+      model: pmos
+      connections: {D: DBL, G: PCHG, S: VDD, B: VDD}
+      parameters: {W: "0.42", L: "0.15", model_name: pmos_1v8}
+
+    # WLENPP = NAND2(cs, WLENP)
+    - id: X13
+      type: subckt
+      model: NAND2
+      connections: {VDD: VDD, VSS: VSS, A: cs, B: WLENP, Y: WLENPP}
+
+    # WLEN high-drive buffer of WLENPP (W=8/4)
+    - id: X21
+      type: primitive
+      model: pmos
+      connections: {D: WLEN, G: WLENPP, S: VDD, B: VDD}
+      parameters: {W: "8", L: "0.15", model_name: pmos_1v8}
+
+    - id: X22
+      type: primitive
+      model: nmos
+      connections: {D: WLEN, G: WLENPP, S: VSS, B: VSS}
+      parameters: {W: "4", L: "0.15", model_name: nmos_1v8}
+
+    # RBL = NOT(DBL_)
+    - id: X15
+      type: subckt
+      model: NOT
+      connections: {VDD: VDD, VSS: VSS, A: DBL_, B: RBL}
+
+    # SAEN_ = NAND2(WLEN, RBL)
+    - id: X16
+      type: subckt
+      model: NAND2
+      connections: {VDD: VDD, VSS: VSS, A: WLEN, B: RBL, Y: SAEN_}
+
+    # SAEN high-drive buffer of SAEN_ (W=8/4)
+    - id: X17
+      type: primitive
+      model: pmos
+      connections: {D: SAEN, G: SAEN_, S: VDD, B: VDD}
+      parameters: {W: "8", L: "0.15", model_name: pmos_1v8}
+
+    - id: X18
+      type: primitive
+      model: nmos
+      connections: {D: SAEN, G: SAEN_, S: VSS, B: VSS}
+      parameters: {W: "4", L: "0.15", model_name: nmos_1v8}
+
+    # WREN high-drive buffer of WREN_ (W=8/4)
+    - id: X19
+      type: primitive
+      model: pmos
+      connections: {D: WREN, G: WREN_, S: VDD, B: VDD}
+      parameters: {W: "8", L: "0.15", model_name: pmos_1v8}
+
+    - id: X20
+      type: primitive
+      model: nmos
+      connections: {D: WREN, G: WREN_, S: VSS, B: VSS}
+      parameters: {W: "4", L: "0.15", model_name: nmos_1v8}

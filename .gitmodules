@@ -1,0 +1,3 @@
+[submodule "vendor/spice_gen"]
+	path = vendor/spice_gen
+	url = https://github.com/ShaheerSajid/spice_gen

@@ -1,0 +1,39 @@
+cell:
+  name: NAND3
+  ports: [VDD, VSS, A, B, C, Y]
+  components:
+    - id: X0
+      type: primitive
+      model: pmos
+      connections: {D: Y, G: A, S: VDD, B: VDD}
+      parameters: {W: "0.42", L: "0.15", model_name: pmos_1v8}
+
+    - id: X1
+      type: primitive
+      model: pmos
+      connections: {D: Y, G: B, S: VDD, B: VDD}
+      parameters: {W: "0.42", L: "0.15", model_name: pmos_1v8}
+
+    - id: X2
+      type: primitive
+      model: pmos
+      connections: {D: Y, G: C, S: VDD, B: VDD}
+      parameters: {W: "0.42", L: "0.15", model_name: pmos_1v8}
+
+    - id: X3
+      type: primitive
+      model: nmos
+      connections: {D: Y, G: A, S: net1, B: VSS}
+      parameters: {W: "0.42", L: "0.15", model_name: nmos_1v8}
+
+    - id: X4
+      type: primitive
+      model: nmos
+      connections: {D: net1, G: B, S: net2, B: VSS}
+      parameters: {W: "0.42", L: "0.15", model_name: nmos_1v8}
+
+    - id: X5
+      type: primitive
+      model: nmos
+      connections: {D: net2, G: C, S: VSS, B: VSS}
+      parameters: {W: "0.42", L: "0.15", model_name: nmos_1v8}
