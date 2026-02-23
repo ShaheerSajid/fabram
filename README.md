@@ -1,6 +1,6 @@
 # fabram
 
-A parametric SRAM compiler for the sky130A PDK. Given three integers — **words**, **bits**, and **column mux factor** — it assembles a fully hierarchical SPICE netlist from hand-crafted cell templates.
+A parametric SRAM compiler. Given three integers — **words**, **bits**, and **column mux factor** — it assembles a fully hierarchical SPICE netlist from hand-crafted cell templates. Defaults to the sky130A PDK; any technology supported by `spice_gen` can be targeted by swapping the cell library and PDK YAML.
 
 ---
 
@@ -8,7 +8,7 @@ A parametric SRAM compiler for the sky130A PDK. Given three integers — **words
 
 - Python ≥ 3.10
 - [`spice_gen`](https://github.com/ShaheerSajid/spice_gen) (vendored as a git submodule)
-- sky130A PDK installed at `/usr/local/share/pdk/sky130A/`
+- PDK installed and referenced by the PDK YAML (default: sky130A at `/usr/local/share/pdk/sky130A/`)
 
 ## Installation
 
@@ -24,6 +24,7 @@ pip install -e .                  # install fabram
 
 ```
 fabram -w <words> -b <bits> [-m <mux>] [-d <dialect>] [-c <corner>] [-o <file>] [--stdout]
+       [--cells-dir <dir>] [--pdk-yaml <file>]
 ```
 
 | Flag | Default | Description |
@@ -35,18 +36,22 @@ fabram -w <words> -b <bits> [-m <mux>] [-d <dialect>] [-c <corner>] [-o <file>] 
 | `-c / --corner` | `tt` | PDK corner (e.g. `tt`, `ff`, `ss`) |
 | `-o / --output` | `<name>.sp` | Output file path |
 | `--stdout` | — | Print to stdout instead of a file |
+| `--cells-dir` | built-in `cells/` | Path to an alternative cell library directory |
+| `--pdk-yaml` | built-in `sky130A.yaml` | Path to a `spice_gen` PDK YAML for another technology |
 
 ### Examples
 
 ```bash
-# 64-word × 8-bit, column mux = 4 → writes SRAM_64x8_CM4.sp
+# 64-word × 8-bit, column mux = 4 → writes SRAM_64x8_CM4.sp  (sky130A)
 fabram -w 64 -b 8 -m 4
 
 # 256 × 32, slow-slow corner, hspice dialect
 fabram -w 256 -b 32 -m 8 -d hspice -c ss -o sram_256x32.sp
 
-# Print to stdout
-fabram -w 16 -b 4 --stdout
+# Different technology: supply your own cell YAMLs and PDK YAML
+fabram -w 64 -b 8 -m 4 \
+       --cells-dir cells_gf180/ \
+       --pdk-yaml  pdks/gf180mcu.yaml
 ```
 
 ---
@@ -55,8 +60,17 @@ fabram -w 16 -b 4 --stdout
 
 ```python
 from fabram import SRAMCompiler
+from pathlib import Path
 
+# sky130A (default)
 netlist = SRAMCompiler(words=64, bits=8, col_mux=4).compile(pdk_corner="tt")
+
+# Different technology
+netlist = SRAMCompiler(
+    words=64, bits=8, col_mux=4,
+    cells_dir=Path("cells_gf180"),
+    pdk_yaml=Path("pdks/gf180mcu.yaml"),
+).compile(pdk_corner="tt")
 ```
 
 `compile()` returns a `spice_gen` `Netlist` object. Pass it to any dialect generator:

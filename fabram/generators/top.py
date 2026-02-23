@@ -47,9 +47,13 @@ class SRAMCompiler:
     ]
 
     def __init__(self, words: int, bits: int, col_mux: int = 1,
-                 cell_ports: CellPorts | None = None) -> None:
+                 cell_ports: CellPorts | None = None,
+                 cells_dir: pathlib.Path | None = None,
+                 pdk_yaml: pathlib.Path | None = None) -> None:
         self.geo = ArrayGeometry(words, bits, col_mux)
         self.cfg = cell_ports if cell_ports is not None else CellPorts()
+        self.cells_dir = cells_dir if cells_dir is not None else _CELLS_DIR
+        self.pdk_yaml  = pdk_yaml  if pdk_yaml  is not None else _PDK_YAML
 
     # ------------------------------------------------------------------
     # Public API
@@ -69,7 +73,7 @@ class SRAMCompiler:
 
         # ---- 1. Load cell templates -----------------------------------
         for rel in self._CELL_YAMLS:
-            add(load_file(_CELLS_DIR / rel).subckt_defs)
+            add(load_file(self.cells_dir / rel).subckt_defs)
 
         # ---- 2. Decoder subcircuits ----------------------------------
         # DEC_2TO4 is needed by nand_dec whenever addr_bits >= 2
@@ -113,12 +117,11 @@ class SRAMCompiler:
         # ---- 4. Top-level subcircuit ---------------------------------
         add([self._build_top(geo, cfg)])
 
-        # ---- 5. Resolve PDK (model name → sky130 subckt names) -------
+        # ---- 5. Resolve PDK (model name → foundry subckt names) ------
         unresolved = Netlist(subckt_defs=all_defs, top_cell=geo.name)
         pdk = PdkConfig.model_validate(
-            __import__("yaml").safe_load(_PDK_YAML.read_text())
+            __import__("yaml").safe_load(self.pdk_yaml.read_text())
         )
-        pdk_inc = PdkInclude(lib_file=str(pdk.lib_path), corner=pdk_corner)
         resolved = resolve(unresolved, pdk, corner=pdk_corner)
         return resolved
 

@@ -30,6 +30,12 @@ def _build_parser() -> argparse.ArgumentParser:
                    help="Output file path. Defaults to <name>.sp in current directory.")
     p.add_argument("--stdout", action="store_true",
                    help="Write output to stdout instead of a file.")
+    p.add_argument("--cells-dir", type=pathlib.Path, default=None,
+                   metavar="DIR",
+                   help="Path to cell library directory (default: built-in cells/).")
+    p.add_argument("--pdk-yaml", type=pathlib.Path, default=None,
+                   metavar="FILE",
+                   help="Path to spice_gen PDK YAML (default: built-in sky130A.yaml).")
     return p
 
 
@@ -37,7 +43,9 @@ def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
 
     try:
-        compiler = SRAMCompiler(args.words, args.bits, args.mux)
+        compiler = SRAMCompiler(args.words, args.bits, args.mux,
+                                cells_dir=args.cells_dir,
+                                pdk_yaml=args.pdk_yaml)
         netlist  = compiler.compile(pdk_corner=args.corner)
     except (ValueError, FileNotFoundError) as exc:
         print(f"fabram: error: {exc}", file=sys.stderr)
