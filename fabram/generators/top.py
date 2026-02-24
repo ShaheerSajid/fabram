@@ -178,9 +178,10 @@ class SRAMCompiler:
             }))
         else:
             # ROW_DEC_{num_rows}: VDD VSS A0..A{row_addr_bits-1} DC0..DC{num_rows-1}
+            # Upper address bits [col_addr_bits : addr_bits-1] select the row.
             rdec_pm: dict[str, str] = {"VDD": "VDD", "VSS": "VSS"}
             for i in range(geo.row_addr_bits):
-                rdec_pm[f"A{i}"] = f"A{i}"          # lower addr bits → row decode
+                rdec_pm[f"A{i}"] = f"A{geo.col_addr_bits + i}"  # upper addr bits → row
             for i in range(geo.num_rows):
                 rdec_pm[f"DC{i}"] = f"DC{i}"
             comps.append(_si("XRDEC", f"ROW_DEC_{geo.num_rows}", rdec_pm))
@@ -198,11 +199,11 @@ class SRAMCompiler:
             # Handled in DIDO instantiation below (SEL0 = WLEN)
             pass
         else:
-            # COL_DEC uses the upper col_addr_bits of the address.
-            # A{row_addr_bits} .. A{addr_bits-1} are the column address bits.
+            # COL_DEC uses the lower col_addr_bits of the address.
+            # A0 .. A{col_addr_bits-1} are the column mux address bits.
             cdec_pm: dict[str, str] = {"VDD": "VDD", "VSS": "VSS"}
             for i in range(geo.col_addr_bits):
-                cdec_pm[f"A{i}"] = f"A{geo.row_addr_bits + i}"  # upper addr bits
+                cdec_pm[f"A{i}"] = f"A{i}"  # lower addr bits → col mux
             for k in range(geo.col_mux):
                 cdec_pm[f"DC{k}"] = f"CD{k}"
             comps.append(_si("XCDEC", f"ROW_DEC_{geo.col_mux}", cdec_pm))
