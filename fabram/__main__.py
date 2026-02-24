@@ -13,14 +13,15 @@ Output layout (relative to CWD, unless --out-dir is overridden)::
 
     out/<macro>/
     ├── netlist/<macro>.sp          compiled SPICE netlist
-    ├── lib/<macro>_<cond>.lib      Liberty timing model  (--char only)
-    ├── waveform/                   SVG waveform plots    (--char, skippable with --no-waveforms)
+    ├── verilog/<macro>.v           Verilog behavioral model   (--verilog)
+    ├── lib/<macro>_<cond>.lib      Liberty timing model       (--char only)
+    ├── waveform/                   SVG waveform plots         (--char, skippable with --no-waveforms)
     │   ├── clkq_q1.{sp,dat,svg}
     │   ├── clkq_q0.{sp,dat,svg}
     │   ├── leakage.{sp,dat,svg}
     │   ├── power_write.{sp,dat,svg}
     │   └── power_read.{sp,dat,svg}
-    └── logs/char.log               characterization log  (--char only)
+    └── logs/char.log               characterization log       (--char only)
 """
 from __future__ import annotations
 
@@ -83,8 +84,14 @@ def _build_parser() -> argparse.ArgumentParser:
                    help="Parallel ngspice workers.")
     p.add_argument("--timeout",   type=int,   default=180,
                    help="Per-simulation ngspice timeout (s).")
+    p.add_argument("--table-size", type=int,  default=5, metavar="N",
+                   help="LUT table dimension N×N (first N entries of default slew/load lists).")
+    p.add_argument("--max-iters",  type=int,  default=60,
+                   help="Max bisection iterations per setup/hold point.")
     p.add_argument("--no-waveforms", action="store_true",
                    help="Skip waveform SVG generation when --char is set.")
+    p.add_argument("--verilog", action="store_true",
+                   help="Generate Verilog behavioral model (functional; add --char for timing specify block).")
 
     # ── Logging ───────────────────────────────────────────────────────────────
     p.add_argument("-v", "--verbose", action="store_true",
@@ -98,6 +105,7 @@ def _make_dirs(out_dir: pathlib.Path, macro: str) -> dict[str, pathlib.Path]:
         "root":     root,
         "netlist":  root / "netlist",
         "lib":      root / "lib",
+        "verilog":  root / "verilog",
         "waveform": root / "waveform",
         "logs":     root / "logs",
     }
@@ -141,6 +149,16 @@ def main(argv: list[str] | None = None) -> int:
     netlist_path.write_text(spice_text, encoding="utf-8")
     print(f"Netlist  {netlist_path}")
 
+    # ── Verilog functional model (no timing) ──────────────────────────────────
+    if args.verilog and not args.char:
+        from verilog_gen import generate_verilog
+        verilog_text = generate_verilog(
+            macro, compiler.geo.words, compiler.geo.addr_bits, compiler.geo.bits,
+        )
+        verilog_path = dirs["verilog"] / f"{macro}.v"
+        verilog_path.write_text(verilog_text, encoding="utf-8")
+        print(f"Verilog  {verilog_path}")
+
     # ── Characterization (--char) ─────────────────────────────────────────────
     if not args.char:
         return 0
@@ -163,13 +181,19 @@ def main(argv: list[str] | None = None) -> int:
     fh.setFormatter(logging.Formatter("%(asctime)s %(levelname)-8s %(message)s"))
     root_log.addHandler(fh)
 
+    _ALL_SLEWS = [0.02, 0.05, 0.1, 0.2, 0.5]
+    _ALL_LOADS = [0.001, 0.005, 0.01, 0.05, 0.1]
+    n = min(args.table_size, 5)
     cfg = CharConfig(
         vdd=args.vdd,
         temp=args.temp,
+        input_slews=_ALL_SLEWS[:n],
+        output_loads=_ALL_LOADS[:n],
         clk_period=args.period,
         sim_timestep=args.timestep,
         max_workers=args.workers,
         sim_timeout=args.timeout,
+        max_iterations=args.max_iters,
     )
 
     try:
@@ -188,6 +212,18 @@ def main(argv: list[str] | None = None) -> int:
     lib_path = dirs["lib"] / f"{macro}_{temp_str}_{vdd_str}V.lib"
     lib_path.write_text(lib_text)
     print(f"Liberty  {lib_path}")
+
+    # ── Verilog timing model ───────────────────────────────────────────────────
+    if args.verilog:
+        from verilog_gen import parse_liberty, generate_verilog
+        timing = parse_liberty(str(lib_path))
+        verilog_text = generate_verilog(
+            macro, compiler.geo.words, compiler.geo.addr_bits, compiler.geo.bits,
+            timing=timing,
+        )
+        verilog_path = dirs["verilog"] / f"{macro}.v"
+        verilog_path.write_text(verilog_text, encoding="utf-8")
+        print(f"Verilog  {verilog_path}  (timing)")
 
     if not args.no_waveforms:
         generate_waveforms(

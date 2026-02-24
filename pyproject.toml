@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "fabram"
 version = "0.1.0"
 requires-python = ">=3.10"
-dependencies = ["spice_gen", "liberty_gen"]
+dependencies = ["spice_gen", "liberty_gen", "verilog_gen"]
 
 [project.scripts]
 fabram = "fabram.__main__:main"

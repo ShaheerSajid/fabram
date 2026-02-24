@@ -4,3 +4,6 @@
 [submodule "vendor/liberty_gen"]
 	path = vendor/liberty_gen
 	url = ./vendor/liberty_gen
+[submodule "vendor/verilog_gen"]
+	path = vendor/verilog_gen
+	url = ./vendor/verilog_gen
