@@ -9,8 +9,7 @@ requires-python = ">=3.10"
 dependencies = ["spice_gen", "liberty_gen"]
 
 [project.scripts]
-fabram      = "fabram.__main__:main"
-fabram-char = "fabram.char_main:main"
+fabram = "fabram.__main__:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["fabram"]
