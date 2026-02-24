@@ -13,9 +13,12 @@ import logging
 import pathlib
 import sys
 
+import pathlib as _pathlib
+import tempfile as _tempfile
+
+from spice_gen.generator.ngspice import NgspiceGenerator
 from fabram.generators.top import SRAMCompiler
-from fabram.characterize.config import CharConfig
-from fabram.characterize.compiler import CharCompiler
+from liberty_gen import CharConfig, CharCompiler
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -101,13 +104,24 @@ def main(argv: list[str] | None = None) -> None:
         print(f"fabram-char: error compiling SRAM netlist: {exc}", file=sys.stderr)
         sys.exit(1)
 
-    # ── Characterize ─────────────────────────────────────────────────────────
-    char = CharCompiler(netlist, sram.geo, cfg=cfg)
+    # ── Render netlist to a temp file, then characterize ─────────────────────
+    _gen = NgspiceGenerator()
+    _spice_text = _gen.generate(netlist)
+    with _tempfile.NamedTemporaryFile(
+        mode="w", suffix=".sp", prefix="fabram_netlist_", delete=False
+    ) as _f:
+        _f.write(_spice_text)
+        _tmp_path = _f.name
     try:
+        char = CharCompiler(
+            _tmp_path, sram.geo.name, sram.geo.addr_bits, sram.geo.bits, cfg=cfg
+        )
         lib_text = char.characterize()
     except Exception as exc:
         print(f"fabram-char: characterization failed: {exc}", file=sys.stderr)
         sys.exit(1)
+    finally:
+        _pathlib.Path(_tmp_path).unlink(missing_ok=True)
 
     # ── Output ───────────────────────────────────────────────────────────────
     if args.stdout:

@@ -1,3 +1,6 @@
 [submodule "vendor/spice_gen"]
 	path = vendor/spice_gen
 	url = https://github.com/ShaheerSajid/spice_gen
+[submodule "vendor/liberty_gen"]
+	path = vendor/liberty_gen
+	url = ./vendor/liberty_gen

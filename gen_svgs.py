@@ -22,13 +22,13 @@ import matplotlib.pyplot as plt
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 
 from fabram import SRAMCompiler
-from fabram.characterize.config import CharConfig
-from fabram.characterize.testbench import (
+from liberty_gen.config import CharConfig
+from liberty_gen.testbench import (
     build_clkq_testbench,
     build_leakage_testbench,
     build_power_testbench,
 )
-from fabram.characterize.runner import run_ngspice
+from liberty_gen.runner import run_ngspice
 from spice_gen.generator.ngspice import NgspiceGenerator
 
 OUT = pathlib.Path("/home/shaheer/Desktop/fabram/svgs")
