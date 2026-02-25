@@ -114,6 +114,26 @@ def _make_dirs(out_dir: pathlib.Path, macro: str) -> dict[str, pathlib.Path]:
     return dirs
 
 
+def _sram_body(words: int, addr_bits: int, bits: int) -> str:
+    """Return the Verilog behavioral body for a synchronous single-port SRAM."""
+    return (
+        f"  localparam NUM_WORDS  = {words};\n"
+        f"  localparam DATA_WIDTH = {bits};\n"
+        f"  localparam ADDR_WIDTH = {addr_bits};\n"
+        f"\n"
+        f"  reg [DATA_WIDTH-1:0] mem [0:NUM_WORDS-1];\n"
+        f"\n"
+        f"  always @(posedge CLK) begin\n"
+        f"    if (CS) begin\n"
+        f"      if (WRITE)\n"
+        f"        mem[addr] <= din;\n"
+        f"      else\n"
+        f"        Q <= mem[addr];\n"
+        f"    end\n"
+        f"  end"
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
 
@@ -151,9 +171,20 @@ def main(argv: list[str] | None = None) -> int:
 
     # ── Verilog functional model (no timing) ──────────────────────────────────
     if args.verilog and not args.char:
-        from verilog_gen import generate_verilog
+        from verilog_gen import Port, LibertyCell, generate_verilog
+        _ports = [
+            Port("CLK",   "input",  1, is_clock=True),
+            Port("CS",    "input",  1),
+            Port("WRITE", "input",  1),
+            Port("addr",  "input",  compiler.geo.addr_bits),
+            Port("din",   "input",  compiler.geo.bits),
+            Port("Q",     "output", compiler.geo.bits, is_reg=True),
+        ]
+        _cell = LibertyCell(name=macro, ports=_ports)
         verilog_text = generate_verilog(
-            macro, compiler.geo.words, compiler.geo.addr_bits, compiler.geo.bits,
+            _cell,
+            behavioral_body=_sram_body(
+                compiler.geo.words, compiler.geo.addr_bits, compiler.geo.bits),
         )
         verilog_path = dirs["verilog"] / f"{macro}.v"
         verilog_path.write_text(verilog_text, encoding="utf-8")
@@ -215,11 +246,15 @@ def main(argv: list[str] | None = None) -> int:
 
     # ── Verilog timing model ───────────────────────────────────────────────────
     if args.verilog:
-        from verilog_gen import parse_liberty, generate_verilog
-        timing = parse_liberty(str(lib_path))
+        from verilog_gen import parse_cell, generate_verilog
+        _cell = parse_cell(str(lib_path))
+        for _p in _cell.ports:
+            if _p.direction == "output":
+                _p.is_reg = True
         verilog_text = generate_verilog(
-            macro, compiler.geo.words, compiler.geo.addr_bits, compiler.geo.bits,
-            timing=timing,
+            _cell,
+            behavioral_body=_sram_body(
+                compiler.geo.words, compiler.geo.addr_bits, compiler.geo.bits),
         )
         verilog_path = dirs["verilog"] / f"{macro}.v"
         verilog_path.write_text(verilog_text, encoding="utf-8")
