@@ -7,3 +7,6 @@
 [submodule "vendor/verilog_gen"]
 	path = vendor/verilog_gen
 	url = ./vendor/verilog_gen
+[submodule "vendor/layout_gen"]
+	path = vendor/layout_gen
+	url = /home/shaheer/Documents/github/layout_gen
