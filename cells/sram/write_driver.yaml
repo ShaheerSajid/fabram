@@ -51,49 +51,49 @@ cell:
       type: primitive
       model: pmos
       connections: {D: net1, G: Din, S: VDD, B: VDD}
-      parameters: {W: "2", L: "0.15", model_name: pmos_1v8}
+      parameters: {W: "8.027", L: "0.15", model_name: pmos_1v8}
 
     - id: X7
       type: primitive
       model: pmos
       connections: {D: DW_, G: en_, S: net1, B: VDD}
-      parameters: {W: "2", L: "0.15", model_name: pmos_1v8}
+      parameters: {W: "8.027", L: "0.15", model_name: pmos_1v8}
 
     # DW_ pull-down path: NMOS stack (WREN & Din → DW_ low)
     - id: X8
       type: primitive
       model: nmos
       connections: {D: DW_, G: WREN, S: net2, B: VSS}
-      parameters: {W: "1", L: "0.15", model_name: nmos_1v8}
+      parameters: {W: "2.502", L: "0.15", model_name: nmos_1v8}
 
     - id: X9
       type: primitive
       model: nmos
       connections: {D: net2, G: Din, S: VSS, B: VSS}
-      parameters: {W: "1", L: "0.15", model_name: nmos_1v8}
+      parameters: {W: "2.502", L: "0.15", model_name: nmos_1v8}
 
     # DW pull-up path: PMOS stack (d_ → net3 → DW when en_ low)
     - id: X10
       type: primitive
       model: pmos
       connections: {D: net3, G: d_, S: VDD, B: VDD}
-      parameters: {W: "2", L: "0.15", model_name: pmos_1v8}
+      parameters: {W: "8.027", L: "0.15", model_name: pmos_1v8}
 
     - id: X11
       type: primitive
       model: pmos
       connections: {D: DW, G: en_, S: net3, B: VDD}
-      parameters: {W: "2", L: "0.15", model_name: pmos_1v8}
+      parameters: {W: "8.027", L: "0.15", model_name: pmos_1v8}
 
     # DW pull-down path: NMOS stack (WREN & d_ → DW low)
     - id: X12
       type: primitive
       model: nmos
       connections: {D: DW, G: WREN, S: net4, B: VSS}
-      parameters: {W: "1", L: "0.15", model_name: nmos_1v8}
+      parameters: {W: "2.502", L: "0.15", model_name: nmos_1v8}
 
     - id: X13
       type: primitive
       model: nmos
       connections: {D: net4, G: d_, S: VSS, B: VSS}
-      parameters: {W: "1", L: "0.15", model_name: nmos_1v8}
+      parameters: {W: "2.502", L: "0.15", model_name: nmos_1v8}

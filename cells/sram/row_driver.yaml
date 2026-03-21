@@ -29,10 +29,10 @@ cell:
       type: primitive
       model: pmos
       connections: {D: B, G: net1, S: VDD, B: VDD}
-      parameters: {W: "8", L: "0.15", model_name: pmos_1v8}
+      parameters: {W: "1.624", L: "0.15", model_name: pmos_1v8}
 
     - id: X2
       type: primitive
       model: nmos
       connections: {D: B, G: net1, S: VSS, B: VSS}
-      parameters: {W: "4", L: "0.15", model_name: nmos_1v8}
+      parameters: {W: "0.420", L: "0.15", model_name: nmos_1v8}
