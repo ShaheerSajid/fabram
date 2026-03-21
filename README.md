@@ -7,14 +7,16 @@ A parametric SRAM compiler. Given three integers — **words**, **bits**, and **
 ## Requirements
 
 - Python ≥ 3.10
-- [`spice_gen`](https://github.com/ShaheerSajid/spice_gen) (vendored as a git submodule)
+- [`spice_gen`](https://github.com/ShaheerSajid/spice_gen), [`liberty_gen`](https://github.com/ShaheerSajid/liberty_gen), [`verilog_gen`](https://github.com/ShaheerSajid/verilog_gen) (vendored as git submodules)
 - PDK installed and referenced by the PDK YAML (default: sky130A at `/usr/local/share/pdk/sky130A/`)
 
 ## Installation
 
 ```bash
 git clone --recurse-submodules <repo-url>
-pip install -e vendor/spice_gen   # install spice_gen first
+pip install -e vendor/spice_gen   # install vendored dependencies first
+pip install -e vendor/liberty_gen
+pip install -e vendor/verilog_gen
 pip install -e .                  # install fabram
 ```
 
@@ -24,29 +26,81 @@ pip install -e .                  # install fabram
 
 ```
 fabram -w <words> -b <bits> [-m <mux>] [-d <dialect>] [-c <corner>] [-o <file>] [--stdout]
-       [--cells-dir <dir>] [--pdk-yaml <file>]
+       [--cells-dir <dir>] [--pdk-yaml <file>] [--out-dir <dir>]
+       [--verilog] [--char] [--no-waveforms]
 ```
+
+**Geometry**
 
 | Flag | Default | Description |
 |---|---|---|
 | `-w / --words` | required | Depth (power of 2) |
 | `-b / --bits` | required | Word width |
 | `-m / --mux` | `1` | Column mux factor (power of 2, ≤ words) |
+
+**PDK / cell source**
+
+| Flag | Default | Description |
+|---|---|---|
 | `-d / --dialect` | `ngspice` | SPICE dialect: `ngspice`, `hspice`, `spice3` |
 | `-c / --corner` | `tt` | PDK corner (e.g. `tt`, `ff`, `ss`) |
-| `-o / --output` | `<name>.sp` | Output file path |
-| `--stdout` | — | Print to stdout instead of a file |
 | `--cells-dir` | built-in `cells/` | Path to an alternative cell library directory |
 | `--pdk-yaml` | built-in `sky130A.yaml` | Path to a `spice_gen` PDK YAML for another technology |
+
+**Output**
+
+| Flag | Default | Description |
+|---|---|---|
+| `--out-dir` | `out/` | Root output directory |
+| `-o / --output` | `out/<macro>/netlist/<macro>.sp` | Write netlist to a specific file path |
+| `--stdout` | — | Print netlist to stdout (skips all file outputs) |
+| `--verilog` | — | Generate Verilog behavioral model; add `--char` to include timing specify block |
+| `--char` | — | Run Liberty characterization after compiling the netlist |
+| `--no-waveforms` | — | Skip SVG waveform generation when `--char` is set |
+
+**Characterization** (only used with `--char`)
+
+| Flag | Default | Description |
+|---|---|---|
+| `--vdd` | `1.8` | Supply voltage (V) |
+| `--temp` | `27.0` | Temperature (°C) |
+| `--period` | `10.0` | Test-clock period (ns) |
+| `--timestep` | `0.02` | ngspice `.tran` timestep (ns) (~2000 steps per sim at default 10 ns clock) |
+| `--workers` | `4` | Parallel ngspice workers |
+| `--timeout` | `180` | Per-simulation ngspice timeout (s) |
+| `--table-size` | `5` | LUT table dimension N×N |
+| `--max-iters` | `60` | Max bisection iterations per setup/hold point |
+
+### Output layout
+
+```
+out/<macro>/
+├── netlist/<macro>.sp          compiled SPICE netlist
+├── verilog/<macro>.v           Verilog behavioral model   (--verilog)
+├── lib/<macro>_<cond>.lib      Liberty timing model       (--char only)
+├── waveform/                   SVG waveform plots         (--char, skippable with --no-waveforms)
+│   ├── clkq_q1.{sp,dat,svg}
+│   ├── clkq_q0.{sp,dat,svg}
+│   ├── leakage.{sp,dat,svg}
+│   ├── power_write.{sp,dat,svg}
+│   └── power_read.{sp,dat,svg}
+└── logs/char.log               characterization log       (--char only)
+```
 
 ### Examples
 
 ```bash
-# 64-word × 8-bit, column mux = 4 → writes SRAM_64x8_CM4.sp  (sky130A)
+# 64-word × 8-bit, column mux = 4 → writes out/SRAM_64x8_CM4/netlist/SRAM_64x8_CM4.sp
 fabram -w 64 -b 8 -m 4
 
 # 256 × 32, slow-slow corner, hspice dialect
 fabram -w 256 -b 32 -m 8 -d hspice -c ss -o sram_256x32.sp
+
+# Generate netlist + Verilog functional model
+fabram -w 64 -b 8 -m 4 --verilog
+
+# Full characterization: netlist + Liberty + Verilog timing model + waveforms
+fabram -w 64 -b 8 -m 4 --char --verilog
 
 # Different technology: supply your own cell YAMLs and PDK YAML
 fabram -w 64 -b 8 -m 4 \
@@ -191,5 +245,7 @@ cells/
 └── sram/                  # bit_cell  dmy_cell  sense_amp  ms_reg
                            # dido  row_driver  write_driver  self_timed_ctrl
 vendor/
-└── spice_gen/             # git submodule
+├── spice_gen/             # git submodule — SPICE netlist generation
+├── liberty_gen/           # git submodule — Liberty characterization (--char)
+└── verilog_gen/           # git submodule — Verilog model generation (--verilog)
 ```
