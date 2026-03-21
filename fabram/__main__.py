@@ -21,6 +21,9 @@ Output layout (relative to CWD, unless --out-dir is overridden)::
     │   ├── leakage.{sp,dat,svg}
     │   ├── power_write.{sp,dat,svg}
     │   └── power_read.{sp,dat,svg}
+    ├── layout/                     GDS + SVG cell layouts     (--layout)
+    │   ├── bit_cell.gds
+    │   └── bit_cell.svg
     └── logs/char.log               characterization log       (--char only)
 """
 from __future__ import annotations
@@ -92,6 +95,8 @@ def _build_parser() -> argparse.ArgumentParser:
                    help="Skip waveform SVG generation when --char is set.")
     p.add_argument("--verilog", action="store_true",
                    help="Generate Verilog behavioral model (functional; add --char for timing specify block).")
+    p.add_argument("--layout", action="store_true",
+                   help="Generate cell GDS layouts and SVG previews via layout_gen.")
 
     # ── Cell optimizer ────────────────────────────────────────────────────────
     p.add_argument("--optimize-cell", action="store_true",
@@ -122,6 +127,7 @@ def _make_dirs(out_dir: pathlib.Path, macro: str) -> dict[str, pathlib.Path]:
         "lib":      root / "lib",
         "verilog":  root / "verilog",
         "waveform": root / "waveform",
+        "layout":   root / "layout",
         "logs":     root / "logs",
     }
     for d in dirs.values():
@@ -267,6 +273,26 @@ def main(argv: list[str] | None = None) -> int:
         verilog_path = dirs["verilog"] / f"{macro}.v"
         verilog_path.write_text(verilog_text, encoding="utf-8")
         print(f"Verilog  {verilog_path}{_timing_note}")
+
+    # ── Layout generation (--layout) ─────────────────────────────────────────
+    if args.layout:
+        try:
+            from layout_gen import draw_bit_cell, load_pdk, write_svg
+            pdk_yaml = args.pdk_yaml  # may be None → layout_gen uses its default
+            _lrules = load_pdk(pdk_yaml) if pdk_yaml else load_pdk()
+
+            _cells_to_draw = {
+                "bit_cell": lambda: draw_bit_cell(rules=_lrules),
+            }
+            for _cname, _cfn in _cells_to_draw.items():
+                _comp = _cfn()
+                _gds  = dirs["layout"] / f"{_cname}.gds"
+                _svg  = dirs["layout"] / f"{_cname}.svg"
+                _comp.write_gds(str(_gds))
+                write_svg(_comp, _svg, rules=_lrules, scale=400)
+                print(f"Layout   {_gds}  +  {_svg.name}")
+        except ImportError:
+            print("Layout   [skipped — layout_gen not installed; run: pip install -e vendor/layout_gen]")
 
     # ── Characterization (--char) ─────────────────────────────────────────────
     if not args.char:
