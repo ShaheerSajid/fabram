@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import pathlib
+import subprocess
 
 import numpy as np
 import matplotlib
@@ -22,7 +23,6 @@ from liberty_gen.testbench import (
     build_leakage_testbench,
     build_power_testbench,
 )
-from liberty_gen.runner import run_ngspice
 
 log = logging.getLogger(__name__)
 
@@ -45,7 +45,7 @@ def generate_waveforms(
       clkq_q1.dat  — raw ngspice wrdata output (ASCII, time+value columns)
       clkq_q1.svg  — rendered waveform plot
     """
-    out_dir = pathlib.Path(out_dir)
+    out_dir = pathlib.Path(out_dir).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
 
     clk_slew = cfg.input_slews[0]
@@ -108,8 +108,19 @@ def generate_waveforms(
 
     for name, deck, col_names, title in sims:
         log.info("[wave] %s …", name)
-        (out_dir / f"{name}.sp").write_text(deck)
-        run_ngspice(deck, cfg.sim_timeout)
+        sp_path = out_dir / f"{name}.sp"
+        sp_path.write_text(deck)
+        try:
+            subprocess.run(
+                ["ngspice", "-b", str(sp_path)],
+                capture_output=True,
+                text=True,
+                timeout=cfg.sim_timeout,
+            )
+        except subprocess.TimeoutExpired:
+            log.warning("[wave] %s: ngspice timed out", name)
+        except FileNotFoundError:
+            log.warning("[wave] %s: ngspice not found on PATH", name)
         dat = out_dir / f"{name}.dat"
         if dat.exists():
             _plot_wrdata(dat, col_names, title, out_dir / f"{name}.svg")

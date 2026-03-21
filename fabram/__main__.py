@@ -43,9 +43,9 @@ def _build_parser() -> argparse.ArgumentParser:
     )
 
     # ── SRAM geometry ────────────────────────────────────────────────────────
-    p.add_argument("-w", "--words",   type=int, required=True,
+    p.add_argument("-w", "--words",   type=int, default=None,
                    help="Number of words (depth); must be a power of 2.")
-    p.add_argument("-b", "--bits",    type=int, required=True,
+    p.add_argument("-b", "--bits",    type=int, default=None,
                    help="Word width in bits.")
     p.add_argument("-m", "--mux",     type=int, default=1,
                    help="Column mux factor (power of 2).")
@@ -78,8 +78,8 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--temp",      type=float, default=27.0, help="Temperature (°C).")
     p.add_argument("--period",    type=float, default=10.0,
                    help="Test-clock period (ns).")
-    p.add_argument("--timestep",  type=float, default=0.001,
-                   help="ngspice .tran timestep (ns).")
+    p.add_argument("--timestep",  type=float, default=0.02,
+                   help="ngspice .tran timestep (ns). Default gives ~2000 steps per sim at 10 ns clock.")
     p.add_argument("--workers",   type=int,   default=4,
                    help="Parallel ngspice workers.")
     p.add_argument("--timeout",   type=int,   default=180,
@@ -92,6 +92,21 @@ def _build_parser() -> argparse.ArgumentParser:
                    help="Skip waveform SVG generation when --char is set.")
     p.add_argument("--verilog", action="store_true",
                    help="Generate Verilog behavioral model (functional; add --char for timing specify block).")
+
+    # ── Cell optimizer ────────────────────────────────────────────────────────
+    p.add_argument("--optimize-cell", action="store_true",
+                   help="Optimise a cell template W/L across TT/SS/FF corners.")
+    p.add_argument("--cell",
+                   choices=["bit_cell", "sense_amp", "row_driver", "write_driver", "dido"],
+                   default="bit_cell",
+                   help="Which cell template to optimise (default: bit_cell).")
+    p.add_argument("--opt-workers", type=int, default=4, metavar="N",
+                   help="Parallel ngspice workers for cell optimizer (default: 4).")
+    p.add_argument("--opt-evals", type=int, default=60, metavar="N",
+                   help="Number of design-point evaluations for cell optimizer (default: 60).")
+    p.add_argument("--opt-strategy", choices=["auto", "bo", "lhs"], default="auto",
+                   help="Cell optimizer search strategy: bo=Bayesian OP (needs scikit-optimize), "
+                        "lhs=Latin Hypercube, auto=bo if available else lhs (default: auto).")
 
     # ── Logging ───────────────────────────────────────────────────────────────
     p.add_argument("-v", "--verbose", action="store_true",
@@ -134,8 +149,61 @@ def _sram_body(words: int, addr_bits: int, bits: int) -> str:
     )
 
 
+def _make_cell_spec(args):
+    """Return (CellSpec, out_dir) for the requested --cell, using -w/-b geometry."""
+    import pathlib
+    cell    = args.cell
+    # Use -w/-b if given; otherwise fall back to sensible defaults
+    words   = args.words or 64
+    bits    = args.bits  or 8
+    mux     = args.mux   or 1
+    num_rows = words
+    num_cols = bits * mux   # total columns = data-width × mux-factor
+
+    if cell == "bit_cell":
+        from fabram.characterize.cells.bit_cell import make_spec
+        return make_spec(), pathlib.Path("out") / "bit_cell_opt"
+
+    if cell == "sense_amp":
+        from fabram.characterize.cells.sense_amp import make_spec
+        return make_spec(num_rows=num_rows), pathlib.Path("out") / "sense_amp_opt"
+
+    if cell == "row_driver":
+        from fabram.characterize.cells.row_driver import make_spec
+        return make_spec(num_cols=num_cols), pathlib.Path("out") / "row_driver_opt"
+
+    if cell == "write_driver":
+        from fabram.characterize.cells.write_driver import make_spec
+        return make_spec(num_rows=num_rows), pathlib.Path("out") / "write_driver_opt"
+
+    if cell == "dido":
+        from fabram.characterize.cells.dido import make_spec
+        return make_spec(num_rows=num_rows), pathlib.Path("out") / "dido_opt"
+
+    raise ValueError(f"Unknown cell: {cell}")
+
+
 def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
+
+    # ── Cell W/L optimizer (standalone; no SRAM geometry required) ───────────
+    if args.optimize_cell:
+        from fabram.characterize import run_optimizer
+        spec, out = _make_cell_spec(args)
+        rec = run_optimizer(
+            spec, out,
+            n_evals=args.opt_evals,
+            max_workers=args.opt_workers,
+            strategy=args.opt_strategy,
+        )
+        params_str = "  ".join(f"{k}={v:.3f}µm" for k, v in rec.params.items())
+        worst_str  = "  ".join(f"{m}={v:.4f}" for m, v in rec.worst.items())
+        print(f"Recommended: {params_str}  {worst_str}")
+        return 0
+
+    # ── Validate SRAM geometry (required unless --optimize-cell) ─────────────
+    if args.words is None or args.bits is None:
+        _build_parser().error("arguments -w/--words and -b/--bits are required")
 
     # ── Compile SRAM netlist ─────────────────────────────────────────────────
     try:
@@ -168,6 +236,7 @@ def main(argv: list[str] | None = None) -> int:
         netlist_path.parent.mkdir(parents=True, exist_ok=True)
     netlist_path.write_text(spice_text, encoding="utf-8")
     print(f"Netlist  {netlist_path}")
+    netlist_path = netlist_path.resolve()  # absolute path for testbench .include directives
 
     # ── Verilog functional model (no timing) ──────────────────────────────────
     if args.verilog and not args.char:
@@ -212,6 +281,10 @@ def main(argv: list[str] | None = None) -> int:
     fh.setFormatter(logging.Formatter("%(asctime)s %(levelname)-8s %(message)s"))
     root_log.addHandler(fh)
 
+    # Suppress noisy DEBUG spam from matplotlib font-cache resolution.
+    logging.getLogger("matplotlib").setLevel(logging.WARNING)
+    logging.getLogger("matplotlib.font_manager").setLevel(logging.WARNING)
+
     _ALL_SLEWS = [0.02, 0.05, 0.1, 0.2, 0.5]
     _ALL_LOADS = [0.001, 0.005, 0.01, 0.05, 0.1]
     n = min(args.table_size, 5)
@@ -232,6 +305,12 @@ def main(argv: list[str] | None = None) -> int:
             str(netlist_path), macro,
             compiler.geo.addr_bits, compiler.geo.bits,
             cfg=cfg,
+            flop_subckt={
+                "name":     "MS_REG",
+                "clk_port": compiler.cfg.reg_clk,
+                "d_port":   compiler.cfg.reg_d,
+                "q_port":   compiler.cfg.reg_q,
+            },
         )
         lib_text = char.characterize()
     except Exception as exc:
