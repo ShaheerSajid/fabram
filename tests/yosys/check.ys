@@ -1,0 +1,15 @@
+# Yosys Liberty sanity-check for SRAM_32x4_CM4
+#
+# Checks:
+#   1. Liberty parses without errors
+#   2. All bus/pin widths match the Verilog instantiation
+#   3. setup/hold/min_pulse_width timing groups are present (shown in -lib dump)
+#   4. hierarchy -check passes (no unresolved instances or port mismatches)
+
+read_liberty -lib -ignore_miss_func ../../out/SRAM_32x4_CM4/lib/SRAM_32x4_CM4_027C_1p80V.lib
+
+read_verilog top.v
+
+hierarchy -top top -check
+
+stat

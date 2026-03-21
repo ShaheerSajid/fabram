@@ -238,18 +238,27 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Netlist  {netlist_path}")
     netlist_path = netlist_path.resolve()  # absolute path for testbench .include directives
 
-    # ── Verilog functional model (no timing) ──────────────────────────────────
+    # ── Verilog model (with timing if an existing .lib is found) ─────────────
     if args.verilog and not args.char:
-        from verilog_gen import Port, LibertyCell, generate_verilog
-        _ports = [
-            Port("CLK",   "input",  1, is_clock=True),
-            Port("CS",    "input",  1),
-            Port("WRITE", "input",  1),
-            Port("addr",  "input",  compiler.geo.addr_bits),
-            Port("din",   "input",  compiler.geo.bits),
-            Port("Q",     "output", compiler.geo.bits, is_reg=True),
-        ]
-        _cell = LibertyCell(name=macro, ports=_ports)
+        from verilog_gen import Port, LibertyCell, generate_verilog, parse_cell
+        existing_libs = sorted(dirs["lib"].glob(f"{macro}_*.lib"))
+        if existing_libs:
+            _cell = parse_cell(str(existing_libs[-1]))   # newest lib alphabetically
+            for _p in _cell.ports:
+                if _p.direction == "output":
+                    _p.is_reg = True
+            _timing_note = "  (timing)"
+        else:
+            _ports = [
+                Port("CLK",   "input",  1, is_clock=True),
+                Port("CS",    "input",  1),
+                Port("WRITE", "input",  1),
+                Port("addr",  "input",  compiler.geo.addr_bits),
+                Port("din",   "input",  compiler.geo.bits),
+                Port("Q",     "output", compiler.geo.bits, is_reg=True),
+            ]
+            _cell = LibertyCell(name=macro, ports=_ports)
+            _timing_note = "  (functional only — run --char first for timing)"
         verilog_text = generate_verilog(
             _cell,
             behavioral_body=_sram_body(
@@ -257,7 +266,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         verilog_path = dirs["verilog"] / f"{macro}.v"
         verilog_path.write_text(verilog_text, encoding="utf-8")
-        print(f"Verilog  {verilog_path}")
+        print(f"Verilog  {verilog_path}{_timing_note}")
 
     # ── Characterization (--char) ─────────────────────────────────────────────
     if not args.char:
