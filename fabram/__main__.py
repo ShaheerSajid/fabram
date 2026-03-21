@@ -97,6 +97,10 @@ def _build_parser() -> argparse.ArgumentParser:
                    help="Generate Verilog behavioral model (functional; add --char for timing specify block).")
     p.add_argument("--layout", action="store_true",
                    help="Generate cell GDS layouts and SVG previews via layout_gen.")
+    p.add_argument("--drc", action="store_true",
+                   help="Run KLayout DRC on generated layouts (requires --layout).")
+    p.add_argument("--drc-tool", default="klayout", metavar="TOOL",
+                   help="DRC backend: 'klayout' (default) or 'magic'.")
 
     # ── Cell optimizer ────────────────────────────────────────────────────────
     p.add_argument("--optimize-cell", action="store_true",
@@ -291,6 +295,20 @@ def main(argv: list[str] | None = None) -> int:
                 _comp.write_gds(str(_gds))
                 write_svg(_comp, _svg, rules=_lrules, scale=400)
                 print(f"Layout   {_gds}  +  {_svg.name}")
+
+                if args.drc:
+                    from layout_gen import run_drc
+                    try:
+                        _viols = run_drc(_gds, _lrules, tool=args.drc_tool,
+                                         cell_name=_comp.name)
+                        if _viols:
+                            print(f"DRC      {len(_viols)} violation(s) in {_cname}:")
+                            for _v in _viols:
+                                print(f"           {_v}")
+                        else:
+                            print(f"DRC      {_cname}: clean (0 violations)")
+                    except RuntimeError as _e:
+                        print(f"DRC      [error] {_e}")
         except ImportError:
             print("Layout   [skipped — layout_gen not installed; run: pip install -e vendor/layout_gen]")
 
